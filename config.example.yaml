@@ -1,0 +1,53 @@
+# exclude-icloud-artifacts configuration
+# Installed to ~/.config/exclude-icloud-artifacts/config.yaml
+# Every key is optional; the values below are the defaults.
+
+# iCloud-synced folders to keep clean.
+roots:
+  - ~/Documents
+  - ~/Desktop
+
+# Seconds FSEvents coalesces events before waking the watcher.
+# Higher = fewer wakeups = less battery.
+latency: 10
+
+# Rule presets to enable. Available:
+#   swift    .build, DerivedData, Pods, Carthage, .docc-build
+#   node     node_modules, .npm, .next, .nuxt, .astro, .docusaurus, .turbo,
+#            .parcel-cache, .angular, .expo, .metro-cache
+#   python   __pycache__, .venv, venv*, .pixi, .tox, .nox, .pytest_cache,
+#            .mypy_cache, .ruff_cache, .hypothesis, .ipynb_checkpoints
+#   java     .gradle, .m2, .kotlin, .cxx, build*, target*
+#   rust     target* (next to Cargo.toml)
+#   dotnet   bin*, obj* (next to *.csproj/*.sln)
+#   go       vendor* (next to go.mod)
+#   php      vendor* (next to composer.json)
+#   ruby     vendor* (next to Gemfile), .jekyll-cache, _site*
+#   dart     .dart_tool, build* (next to pubspec.yaml)
+#   elixir   _build, deps* (next to mix.exs)
+#   haskell  .stack-work, dist-newstyle
+#   scala    target* (next to build.sbt), .bloop, .metals, .bsp
+#   zig      .zig-cache, zig-cache, zig-out
+#   cpp      cmake-build-*, .clangd, .ccls-cache
+#   unity    Library/Temp/Logs/obj (next to ProjectSettings)
+#   cloud    .terraform, .terragrunt-cache, .vagrant, .serverless,
+#            .firebase, cdk.out, .aws-sam
+#   general  .cache, and any folder containing a CACHEDIR.TAG marker
+#            (https://bford.info/cachedir/ - cargo writes it into target/)
+# (* = guarded: only excluded when the marker file/folder noted is present)
+presets:
+  - swift
+  - node
+  - python
+  - java
+  - rust
+  - general
+
+# Extra rules on top of the presets. Folder names and conditions support
+# shell-style globs.
+rules: []
+#  - folder: MyRenderCache
+#  - folder: output
+#    ifSiblingExists: [project.toml]
+#  - folder: scratch
+#    ifChildExists: [.regenerable]

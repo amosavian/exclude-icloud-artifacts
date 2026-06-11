@@ -1,9 +1,11 @@
 # exclude-icloud-artifacts
 
-Keep build artifacts and caches out of iCloud Drive.
+Keep build artifacts and caches out of iCloud Drive, Dropbox, Google Drive,
+and OneDrive.
 
-A tiny macOS background tool that watches your iCloud-synced folders
-(`~/Documents` and `~/Desktop` by default) and marks build-artifact folders —
+A tiny macOS background tool that watches your cloud-synced folders
+(`~/Documents`, `~/Desktop`, and `~/Library/CloudStorage` by default) and
+marks build-artifact folders —
 `.build`, `node_modules`, `DerivedData`, `target`, and friends — with the
 File Provider *ignore* extended attribute (`com.apple.fileprovider.ignore#P`,
 macOS 12.3+). Tagged folders:
@@ -28,7 +30,8 @@ moment they appear, and iCloud skips them from then on.
 
 - macOS 13 Ventura or later (the ignore attribute works on macOS 12.3+)
 - Swift 6 toolchain (Xcode 16+) to build
-- iCloud Drive enabled (otherwise the tag is harmless)
+- Any File Provider cloud: iCloud Drive, Dropbox, Google Drive, OneDrive,
+  Box, ... (without one the tag is harmless)
 
 ## Install
 
@@ -42,7 +45,8 @@ This builds the release binary, copies it to `~/.local/bin`, installs a
 default config to `~/.config/exclude-icloud-artifacts/config.yaml` (if none
 exists), and loads a login LaunchAgent
 (`com.mousavian.exclude-icloud-artifacts`) that keeps the watcher running.
-Logs go to `/tmp/exclude-icloud-artifacts.log`.
+Logs go to `~/Library/Logs/exclude-icloud-artifacts.log` (stderr redirected
+by the agent; also browsable in Console.app under Log Reports).
 
 After changing the config, run `./install.sh` again, or:
 
@@ -75,10 +79,13 @@ Read from `~/.config/exclude-icloud-artifacts/config.yaml`; see
 key is optional:
 
 ```yaml
-roots:                # iCloud-synced folders to keep clean
+roots:                # cloud-synced folders to keep clean
   - ~/Documents
   - ~/Desktop
+  - ~/Library/CloudStorage    # Dropbox, Google Drive, OneDrive, ...
 latency: 10           # seconds FSEvents batches events (higher = less battery)
+skipCloudOnly: false  # true = never tag folders whose files are evicted
+                      # (cloud-only); see "Notes & FAQ"
 presets:              # rule bundles to enable, see table below
   - swift
   - node
@@ -148,17 +155,46 @@ tools not listed above are often caught automatically.
   minute with one batch instead of thousands of times. Between batches the
   process sleeps at 0.0 % CPU in a few MB of memory.
 - **No subprocesses, no polling.** Matching and tagging happen in-process.
-  Folders created inside an already-tagged tree are skipped with a cheap
-  xattr ancestor walk before any directory listing. If the kernel event
-  queue ever overflows, the watcher falls back to a full sweep, so nothing
-  is missed.
-- **At startup** the watcher does one catch-up sweep for anything created
-  while it was not running.
+  Events inside artifact trees are skipped by path pattern alone — no
+  syscalls — with an xattr ancestor walk (memoized) as the precise check.
+  If the kernel event queue overflows under heavy build load, the watcher
+  rescans just the invalidated subtree, at most once a minute.
+- **Sweeps run only when needed.** A full catch-up sweep runs on first
+  install and whenever the configuration changes (tracked via a fingerprint
+  stamp); plain agent restarts skip the walk entirely. Run
+  `exclude-icloud-artifacts --sweep` to force one.
+
+## Other cloud providers
+
+The ignore attribute is enforced by macOS's `fileproviderd`, not by iCloud:
+every cloud client built on the File Provider framework honors it. Dropbox,
+Google Drive, and OneDrive all live under `~/Library/CloudStorage`, which is
+watched by default — artifacts there get tagged and skipped exactly like in
+iCloud Drive. Two provider-specific notes:
+
+- **Google Drive:** only the default *streaming* mode (the
+  `~/Library/CloudStorage` location) goes through File Provider. The legacy
+  *mirror* mode syncs a plain folder on its own and ignores the attribute.
+- **OneDrive** also has a built-in name-pattern ignore list
+  (`defaults write com.microsoft.OneDrive EnableODIgnore -array node_modules`),
+  but it cannot express this tool's marker-file guards.
 
 ## Notes & FAQ
 
-**Is anything deleted?** No. The folder stays on disk; only its *sync* is
-disabled. Deleting the attribute (`xattr -d`) re-syncs it.
+**Is anything deleted?** Nothing local. The folder stays on disk; only its
+*sync* is disabled. But note the flip side: if a folder was *already
+uploaded*, tagging it removes the cloud copy — and therefore the copy on
+your other devices. For regenerable artifacts that is the intended cleanup.
+Deleting the attribute (`xattr -d`) re-syncs it.
+
+**What about folders whose files are evicted (cloud-only)?** By default they
+are tagged like everything else — artifact folders are regenerable, so the
+cloud copy is cleaned up even when the local files are dataless placeholders
+("Optimize Mac Storage" / Files On-Demand evictions). If you'd rather err on
+the safe side, set `skipCloudOnly: true`: the watcher then refuses to tag
+any folder containing evicted files — since the server holds their only full
+copy — and logs a warning instead. Download the folder first if you want it
+excluded anyway.
 
 **These folders are not backed up then?** Right — that is the point: they are
 regenerable from source. Keep anything precious out of artifact folders.

@@ -1,7 +1,8 @@
 // exclude-icloud-artifacts
-// Keeps build-artifact folders under iCloud-synced roots (~/Documents and
-// ~/Desktop by default) out of iCloud Drive sync by tagging them with the
-// File Provider ignore xattr (macOS 12.3+).
+// Keeps build-artifact folders under cloud-synced roots (~/Documents,
+// ~/Desktop, and ~/Library/CloudStorage by default) out of iCloud Drive,
+// Dropbox, Google Drive, and OneDrive sync by tagging them with the File
+// Provider ignore xattr (macOS 12.3+).
 //
 // Modes:
 //   (no args)         catch-up sweep, then watch the roots via FSEvents and
@@ -29,6 +30,12 @@ struct ExcludeICloudArtifacts {
     }
 
     static func main() {
+        // Diagnostics go to stderr via swift-log's stock handler; stdout
+        // stays reserved for command output (--report). The LaunchAgent
+        // redirects stderr to a log file, and stderr is unbuffered, so the
+        // file stays live.
+        LoggingSystem.bootstrap(StreamLogHandler.standardError)
+
         var mode = Mode.watch
         var configPath: FilePath?
 
@@ -53,6 +60,7 @@ struct ExcludeICloudArtifacts {
             Watcher(configuration: configuration).run()
         case .sweep:
             Tagger(configuration: configuration).sweep()
+            configuration.recordSweep()
         case .report:
             Reporter(configuration: configuration).run()
         }

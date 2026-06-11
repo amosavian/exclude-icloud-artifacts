@@ -12,7 +12,7 @@ BINARY="$BIN_DIR/exclude-icloud-artifacts"
 LABEL="com.mousavian.exclude-icloud-artifacts"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 CONFIG_DIR="$HOME/.config/exclude-icloud-artifacts"
-LOG="/tmp/exclude-icloud-artifacts.log"
+LOG="$HOME/Library/Logs/exclude-icloud-artifacts.log"
 DOMAIN="gui/$(id -u)"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
@@ -65,8 +65,6 @@ cat > "$PLIST" <<EOF
     <true/>
     <key>Nice</key>
     <integer>10</integer>
-    <key>StandardOutPath</key>
-    <string>$LOG</string>
     <key>StandardErrorPath</key>
     <string>$LOG</string>
 </dict>

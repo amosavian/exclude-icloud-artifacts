@@ -1,7 +1,8 @@
 // exclude-icloud-artifacts
-// Keeps build-artifact folders under iCloud-synced roots (~/Documents and
-// ~/Desktop by default) out of iCloud Drive sync by tagging them with the
-// File Provider ignore xattr (macOS 12.3+).
+// Keeps build-artifact folders under cloud-synced roots (~/Documents,
+// ~/Desktop, and ~/Library/CloudStorage by default) out of iCloud Drive,
+// Dropbox, Google Drive, and OneDrive sync by tagging them with the File
+// Provider ignore xattr (macOS 12.3+).
 //
 // Modes:
 //   (no args)         catch-up sweep, then watch the roots via FSEvents and

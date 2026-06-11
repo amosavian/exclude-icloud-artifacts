@@ -7,6 +7,7 @@ import Yams
 struct ConfigFile: Decodable {
     var roots: [String]?
     var latency: Double?
+    var skipCloudOnly: Bool?
     var presets: [String]?
     var rules: [ExclusionRule]?
 }
@@ -20,7 +21,14 @@ struct Configuration: Sendable {
     /// Higher = fewer wakeups = less battery.
     let latency: Double
 
-    static let defaultRoots = ["~/Documents", "~/Desktop"]
+    /// Skip folders whose subtree contains cloud-evicted (dataless) items
+    /// instead of tagging them. Tagging removes any already-uploaded copy
+    /// from the server, which for evicted content is the only full copy.
+    /// Off by default: artifact folders are regenerable, so they are
+    /// excluded (and cleaned from the cloud) even when evicted.
+    let skipCloudOnly: Bool
+
+    static let defaultRoots = ["~/Documents", "~/Desktop", "~/Library/CloudStorage"]
     static let defaultPresets = ["swift", "node", "python", "java", "rust", "general"]
 
     static var defaultConfigPath: FilePath {
@@ -55,6 +63,7 @@ struct Configuration: Sendable {
             FilePath(($0 as NSString).expandingTildeInPath)
         }
         latency = file.latency ?? 10
+        skipCloudOnly = file.skipCloudOnly ?? false
 
         var rules: [ExclusionRule] = []
         for name in file.presets ?? Self.defaultPresets {

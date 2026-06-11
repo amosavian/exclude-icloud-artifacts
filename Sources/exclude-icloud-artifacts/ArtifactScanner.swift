@@ -54,12 +54,30 @@ struct Tagger: Sendable {
 
     func tagIfNeeded(_ path: FilePath) {
         guard path.isDirectory, !tag.isSet(on: path) else { return }
+        if configuration.skipCloudOnly, let evicted = firstEvictedItem(in: path) {
+            logger.warning(
+                "not excluding \(path): \(evicted) is cloud-only (dataless) and excluding would delete its only full copy from the server")
+            return
+        }
         do {
             try tag.set(on: path)
             logger.info("excluded: \(path)")
         } catch {
             logger.error("setxattr failed for \(path): \(error)")
         }
+    }
+
+    /// First dataless item in the subtree, nil when everything is local.
+    /// lstat/readdir only; symlinks are not followed (isDirectory is lstat).
+    private func firstEvictedItem(in path: FilePath) -> FilePath? {
+        if path.isDataless { return path }
+        guard path.isDirectory else { return nil }
+        for entry in ArtifactScanner.list(path) {
+            if let found = firstEvictedItem(in: path.appending(entry)) {
+                return found
+            }
+        }
+        return nil
     }
 
     /// One full pass over the trees, tagging every untagged artifact folder.

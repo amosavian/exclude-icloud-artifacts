@@ -13,6 +13,15 @@ extension FilePath {
         withPlatformString { access($0, F_OK) == 0 }
     }
 
+    /// True when a file provider has evicted this item's content to the
+    /// cloud (SF_DATALESS): the local entry is a placeholder without bytes.
+    /// lstat-only - never triggers a download.
+    var isDataless: Bool {
+        var status = stat()
+        let ok = withPlatformString { lstat($0, &status) == 0 }
+        return ok && (status.st_flags & UInt32(SF_DATALESS)) != 0
+    }
+
     /// Value of the named extended attribute, nil when absent.
     func extendedAttribute(_ name: String) -> [UInt8]? {
         withPlatformString { path in
@@ -32,17 +41,30 @@ extension FilePath {
     }
 }
 
-/// The extended attribute that tells the File Provider (iCloud Drive) to
-/// keep an item out of sync (macOS 12.3+).
-struct SyncExclusionTag: Sendable {
-    static let attributeName = "com.apple.fileprovider.ignore#P"
-    private static let enabled: [UInt8] = [UInt8(ascii: "1")]
+/// A boolean extended attribute: present-and-equal-to-`enabledValue` means on.
+/// Conformers supply the two statics; the read/write logic is shared.
+protocol ExtendedAttribute: Sendable {
+    /// The xattr name, including any File Provider flag suffix (e.g. `#P`).
+    static var attributeName: String { get }
+    /// The byte value that means "set"; the attribute is considered on only
+    /// when its stored value equals this exactly.
+    static var enabledValue: [UInt8] { get }
+}
 
+extension ExtendedAttribute {
     func isSet(on path: FilePath) -> Bool {
-        path.extendedAttribute(Self.attributeName) == Self.enabled
+        path.extendedAttribute(Self.attributeName) == Self.enabledValue
     }
 
     func set(on path: FilePath) throws {
-        try path.setExtendedAttribute(Self.attributeName, to: Self.enabled)
+        try path.setExtendedAttribute(Self.attributeName, to: Self.enabledValue)
     }
+}
+
+/// The extended attribute that tells fileproviderd to keep an item out of
+/// sync (macOS 12.3+). Honored for every File Provider domain: iCloud Drive,
+/// plus Dropbox, Google Drive, and OneDrive under ~/Library/CloudStorage.
+struct SyncExclusionTag: ExtendedAttribute {
+    static let attributeName = "com.apple.fileprovider.ignore#P"
+    static let enabledValue: [UInt8] = [UInt8(ascii: "1")]
 }

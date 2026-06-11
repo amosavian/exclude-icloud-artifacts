@@ -16,8 +16,6 @@ struct Watcher {
     }
 
     func run() -> Never {
-        tagger.sweep() // catch up on anything created while not running
-
         let queue = DispatchQueue(label: "exclude-icloud-artifacts", qos: .background)
         let stream = FSEventStream(
             paths: configuration.roots,
@@ -31,12 +29,13 @@ struct Watcher {
             logger.error("could not start FSEvents stream: \(error)")
             exit(1)
         }
+        tagger.sweep() // catch up on anything created while not running
         let roots = configuration.roots.map(\.string).joined(separator: ", ")
         logger.info("watching \(roots) (latency \(Int(configuration.latency))s)")
         dispatchMain()
     }
 
-    private func handle(_ event: FSEvent) {
+    func handle(_ event: FSEvent) {
         if event.flags.contains(.mustScanSubDirs) {
             // The kernel event queue overflowed; catch up with a full sweep.
             tagger.sweep()

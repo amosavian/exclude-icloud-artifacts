@@ -2,14 +2,23 @@
 # Installed to ~/.config/exclude-icloud-artifacts/config.yaml
 # Every key is optional; the values below are the defaults.
 
-# iCloud-synced folders to keep clean.
+# Cloud-synced folders to keep clean. ~/Library/CloudStorage covers every
+# File Provider account: Dropbox, Google Drive, OneDrive, Box, ...
 roots:
   - ~/Documents
   - ~/Desktop
+  - ~/Library/CloudStorage
 
 # Seconds FSEvents coalesces events before waking the watcher.
 # Higher = fewer wakeups = less battery.
 latency: 10
+
+# Excluding a folder removes any already-uploaded copy from the cloud (and
+# other devices); the local copy is kept. Set true to skip folders whose
+# files are evicted / cloud-only (dataless) — for those, the server holds
+# the only full copy. Default false: artifact folders are regenerable, so
+# they are excluded (and cleaned from the cloud) even when evicted.
+skipCloudOnly: false
 
 # Rule presets to enable. Available:
 #   swift    .build, DerivedData, Pods, Carthage, .docc-build

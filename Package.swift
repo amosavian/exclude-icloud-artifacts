@@ -16,5 +16,12 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
             ]
         ),
+        .testTarget(
+            name: "exclude-icloud-artifactsTests",
+            dependencies: [
+                "exclude-icloud-artifacts",
+                .product(name: "Yams", package: "Yams"),
+            ]
+        ),
     ]
 )

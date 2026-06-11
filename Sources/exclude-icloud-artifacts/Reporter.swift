@@ -31,17 +31,20 @@ struct Reporter {
         print("\n\(formatter.string(fromByteCount: total).leftPadded(to: 12))  total")
     }
 
+    /// Iterative readdir walk summing st_blocks - several times faster than
+    /// a FileManager enumerator, which allocates URLs and resource
+    /// dictionaries per item.
     private func allocatedSize(_ path: FilePath) -> Int64 {
-        let keys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey, .isRegularFileKey]
-        guard let enumerator = FileManager.default.enumerator(
-            at: URL(fileURLWithPath: path.string),
-            includingPropertiesForKeys: Array(keys)
-        ) else { return 0 }
         var total: Int64 = 0
-        for case let url as URL in enumerator {
-            guard let values = try? url.resourceValues(forKeys: keys),
-                  values.isRegularFile == true else { continue }
-            total += Int64(values.totalFileAllocatedSize ?? 0)
+        var stack = [path]
+        while let directory = stack.popLast() {
+            let entries = ArtifactScanner.list(directory)
+            for file in entries.regularFiles {
+                total += directory.appending(file).allocatedBytes
+            }
+            for subdirectory in entries.directories {
+                stack.append(directory.appending(subdirectory))
+            }
         }
         return total
     }

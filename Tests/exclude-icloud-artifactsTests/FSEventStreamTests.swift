@@ -15,8 +15,11 @@ import Testing
             latency: 0.1,
             queue: DispatchQueue(label: "fsevents-test")
         ) { event in
-            if event.path.lastComponent?.string == "fresh-dir",
-               event.flags.contains(.isDirectory) {
+            // Directory-mode FSEvents reports the dir containing the change
+            // (the watched root here); the new dir itself may also appear.
+            // Compare last components: FSEvents resolves /var -> /private/var.
+            if event.path.lastComponent == root.lastComponent
+                || event.path.lastComponent?.string == "fresh-dir" {
                 received.signal()
             }
         }

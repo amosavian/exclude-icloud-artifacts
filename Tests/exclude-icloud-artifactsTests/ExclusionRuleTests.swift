@@ -55,7 +55,7 @@ import Yams
 }
 
 @Suite struct ExclusionRuleSiblingGuardTests {
-    private func noChildren() -> Set<String> { [] }
+    private func noChildren() -> [String] { [] }
 
     @Test func excludedOnlyWhenSiblingPresent() {
         let rule = ExclusionRule("target", ifSiblingExists: ["Cargo.toml"])

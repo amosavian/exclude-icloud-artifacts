@@ -44,8 +44,8 @@ struct ExclusionRule: Sendable, Decodable {
     /// `children` lazily lists the folder itself.
     func matches(
         directoryNamed name: String,
-        siblings: Set<String>,
-        children: () -> Set<String>
+        siblings: [String],
+        children: () -> [String]
     ) -> Bool {
         guard nameMatches(name) else { return false }
         if !ifSiblingExists.isEmpty,
@@ -66,7 +66,7 @@ struct ExclusionRule: Sendable, Decodable {
         return fnmatch(pattern, name, 0) == 0
     }
 
-    private static func matches(anyPattern patterns: [String], in entries: Set<String>) -> Bool {
+    private static func matches(anyPattern patterns: [String], in entries: [String]) -> Bool {
         patterns.contains { pattern in
             guard pattern.contains(where: { "*?[".contains($0) }) else {
                 return entries.contains(pattern)

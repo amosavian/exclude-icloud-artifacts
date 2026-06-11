@@ -77,6 +77,69 @@ import Testing
     }
 }
 
+@Suite struct UnguardedNameIndexTests {
+    private var config: Configuration {
+        Configuration(file: ConfigFile(
+            roots: [], latency: nil, presets: ["node", "rust", "cpp", "general"], rules: []))
+    }
+
+    @Test func unconditionalExactNamesGuaranteeExclusion() {
+        #expect(config.nameIsUnguardedArtifact("node_modules"))
+        #expect(config.nameIsUnguardedArtifact(".cache"))
+    }
+
+    @Test func guardedNamesAreNotIndexed() {
+        // rust `target` needs a Cargo.toml sibling - name alone proves nothing.
+        #expect(!config.nameIsUnguardedArtifact("target"))
+        // `*` (CACHEDIR.TAG) is child-guarded and must never match by name.
+        #expect(!config.nameIsUnguardedArtifact("anything"))
+        #expect(!config.nameIsUnguardedArtifact("src"))
+    }
+
+    @Test func unguardedGlobNamesMatch() {
+        #expect(config.nameIsUnguardedArtifact("cmake-build-debug"))
+        #expect(!config.nameIsUnguardedArtifact("cmake-build"))
+    }
+}
+
+@Suite struct SweepStampTests {
+    private func config(rules: [ExclusionRule], source: FilePath? = nil) -> Configuration {
+        Configuration(
+            file: ConfigFile(roots: ["/tmp/r"], latency: nil, presets: [], rules: rules),
+            source: source)
+    }
+
+    @Test func fingerprintIsStableAndLatencyInsensitive() {
+        let a = Configuration(file: ConfigFile(
+            roots: ["/tmp/r"], latency: 5, presets: ["rust"], rules: []))
+        let b = Configuration(file: ConfigFile(
+            roots: ["/tmp/r"], latency: 99, presets: ["rust"], rules: []))
+        #expect(a.sweepFingerprint == b.sweepFingerprint)
+    }
+
+    @Test func fingerprintChangesWithRulesAndRoots() {
+        let base = config(rules: [ExclusionRule("node_modules")])
+        #expect(base.sweepFingerprint != config(rules: [ExclusionRule(".build")]).sweepFingerprint)
+        let otherRoots = Configuration(file: ConfigFile(
+            roots: ["/tmp/other"], latency: nil, presets: [], rules: [ExclusionRule("node_modules")]))
+        #expect(base.sweepFingerprint != otherRoots.sweepFingerprint)
+    }
+
+    @Test func startupSweepNeededOnlyUntilRecorded() throws {
+        let dir = try makeTempDir()
+        defer { removeDir(dir) }
+        let source = dir.appending("config.yaml")
+
+        let configuration = config(rules: [ExclusionRule("node_modules")], source: source)
+        #expect(configuration.needsStartupSweep(), "no stamp yet - must sweep")
+        configuration.recordSweep()
+        #expect(!configuration.needsStartupSweep(), "same config - no sweep on restart")
+
+        let changed = config(rules: [ExclusionRule(".build")], source: source)
+        #expect(changed.needsStartupSweep(), "config changed - sweep again")
+    }
+}
+
 @Suite struct ConfigurationLoadTests {
     @Test func loadsYamlFromDisk() throws {
         let dir = try makeTempDir()

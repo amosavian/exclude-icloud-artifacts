@@ -21,8 +21,12 @@ enum FSEventStreamError: Error {
     case startFailed
 }
 
-/// Thin wrapper around a CoreServices FSEventStream that delivers per-file
-/// events to a handler on the given queue.
+/// Thin wrapper around a CoreServices FSEventStream that delivers
+/// per-directory events to a handler on the given queue. Deliberately NOT
+/// using kFSEventStreamCreateFlagFileEvents: per-file records overflow the
+/// event queue during heavy builds (tens of thousands of ops per second),
+/// and every overflow forces an expensive catch-up rescan. Per-directory
+/// records coalesce all of that pressure away.
 final class FSEventStream {
     private let paths: [FilePath]
     private let latency: Double
@@ -57,7 +61,6 @@ final class FSEventStream {
         )
         let createFlags = FSEventStreamCreateFlags(
             kFSEventStreamCreateFlagUseCFTypes |
-            kFSEventStreamCreateFlagFileEvents |
             kFSEventStreamCreateFlagIgnoreSelf
         )
         guard let stream = FSEventStreamCreate(

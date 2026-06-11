@@ -7,32 +7,38 @@ import System
 struct ArtifactScanner {
     let configuration: Configuration
 
-    static func list(_ path: FilePath) -> Set<String> {
-        Set((try? FileManager.default.contentsOfDirectory(atPath: path.string)) ?? [])
+    static func list(_ path: FilePath) -> DirectoryEntries {
+        path.listEntries()
     }
 
     func scan(_ visit: (FilePath) -> Void) {
         for root in configuration.roots {
-            scan(directory: root, entries: Self.list(root), visit)
+            scan(under: root, visit)
         }
     }
 
-    private func scan(directory: FilePath, entries: Set<String>, _ visit: (FilePath) -> Void) {
-        for entry in entries {
+    /// Walks a single subtree only - the scoped catch-up used after an
+    /// FSEvents queue overflow names the invalidated directory.
+    func scan(under root: FilePath, _ visit: (FilePath) -> Void) {
+        scan(directory: root, entries: Self.list(root), visit)
+    }
+
+    private func scan(directory: FilePath, entries: DirectoryEntries, _ visit: (FilePath) -> Void) {
+        for entry in entries.directories {
             let path = directory.appending(entry)
-            guard path.isDirectory else { continue }
 
             // The child listing doubles as the recursion listing; compute it
             // at most once, and only when a rule actually needs it.
-            var cachedChildren: Set<String>?
-            let children: () -> Set<String> = {
+            var cachedChildren: DirectoryEntries?
+            let children: () -> [String] = {
                 if cachedChildren == nil { cachedChildren = Self.list(path) }
-                return cachedChildren!
+                return cachedChildren!.names
             }
 
-            let isArtifact = configuration.rules.contains { rule in
-                rule.matches(directoryNamed: entry, siblings: entries, children: children)
-            }
+            let isArtifact = configuration.unguardedExactNames.contains(entry)
+                || configuration.rules.contains { rule in
+                    rule.matches(directoryNamed: entry, siblings: entries.names, children: children)
+                }
             if isArtifact {
                 visit(path)
             } else {
@@ -72,7 +78,7 @@ struct Tagger: Sendable {
     private func firstEvictedItem(in path: FilePath) -> FilePath? {
         if path.isDataless { return path }
         guard path.isDirectory else { return nil }
-        for entry in ArtifactScanner.list(path) {
+        for entry in ArtifactScanner.list(path).names {
             if let found = firstEvictedItem(in: path.appending(entry)) {
                 return found
             }

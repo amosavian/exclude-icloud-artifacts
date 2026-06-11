@@ -45,7 +45,8 @@ This builds the release binary, copies it to `~/.local/bin`, installs a
 default config to `~/.config/exclude-icloud-artifacts/config.yaml` (if none
 exists), and loads a login LaunchAgent
 (`com.mousavian.exclude-icloud-artifacts`) that keeps the watcher running.
-Logs go to `/tmp/exclude-icloud-artifacts.log`.
+Logs go to `~/Library/Logs/exclude-icloud-artifacts.log` (stderr redirected
+by the agent; also browsable in Console.app under Log Reports).
 
 After changing the config, run `./install.sh` again, or:
 
@@ -154,12 +155,14 @@ tools not listed above are often caught automatically.
   minute with one batch instead of thousands of times. Between batches the
   process sleeps at 0.0 % CPU in a few MB of memory.
 - **No subprocesses, no polling.** Matching and tagging happen in-process.
-  Folders created inside an already-tagged tree are skipped with a cheap
-  xattr ancestor walk before any directory listing. If the kernel event
-  queue ever overflows, the watcher falls back to a full sweep, so nothing
-  is missed.
-- **At startup** the watcher does one catch-up sweep for anything created
-  while it was not running.
+  Events inside artifact trees are skipped by path pattern alone — no
+  syscalls — with an xattr ancestor walk (memoized) as the precise check.
+  If the kernel event queue overflows under heavy build load, the watcher
+  rescans just the invalidated subtree, at most once a minute.
+- **Sweeps run only when needed.** A full catch-up sweep runs on first
+  install and whenever the configuration changes (tracked via a fingerprint
+  stamp); plain agent restarts skip the walk entirely. Run
+  `exclude-icloud-artifacts --sweep` to force one.
 
 ## Other cloud providers
 
